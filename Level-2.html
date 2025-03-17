@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temperature Chart with Legend</title>
+    <!-- Load D3.js library (version 6) -->
+    <script src="https://d3js.org/d3.v6.js"></script>
+    <style>
+        /* Styling for the chart container to allow wrapping of individual month charts */
+        .chart {
+            display: flex; 
+            flex-wrap: wrap; 
+        }
+        /* Styling for individual month charts */
+        .month-chart {
+            margin: 5px; 
+        }
+        /* Styling for the tooltip */
+        .tooltip {
+            position: absolute; 
+            background: white; 
+            padding: 8px; 
+            border: 2px solid #ccc; 
+            border-radius: 5px;
+            font-size: 10px; 
+            visibility: hidden; 
+        }
+        /* Styling for axis text */
+        .axis text {
+            font-family: "Times New Roman"; 
+            font-size: 15px; 
+        }
+    </style>
+</head>
+<body>
+    <!-- Container where the chart SVG will be appended -->
+    <div id="chart" class="chart"></div>
+    <!-- Tooltip div to display data on hover -->
+    <div id="tooltip" class="tooltip"></div>
+    <script>
+        // Load CSV data 
+        d3.csv("https://raw.githubusercontent.com/xiameng552180/CSCE-679-Data-Visualization-Assignment2/main/temperature_daily.csv").then(function(data) {
+            // Define date parser for the "YYYY-MM-DD" format
+            const parseDate = d3.timeParse("%Y-%m-%d");
+            // Convert string data to appropriate types
+            data.forEach(d => {
+                d.date = parseDate(d.date); 
+                d.max_temperature = +d.max_temperature; 
+                d.min_temperature = +d.min_temperature; 
+            });
+
+            // Group data by year and month
+            const nestedData = d3.group(data, 
+                d => d.date.getFullYear(), 
+                d => d.date.getMonth() + 1 
+            );
+            // Draw charts using the nested data
+            drawCharts(nestedData);
+        });
+
+        // Define color scale for temperature visualization
+        const colorScale = d3.scaleSequential(d3.interpolateRdYlBu) 
+            .domain([40, 0]); 
+
+        // Define arrays for years and months to be displayed
+        const years = d3.range(2008, 2018);
+        const months = d3.range(1, 13);
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]; // Month names for Y-axis
+
+        //  draw the charts
+        function drawCharts(nestedData) {
+            const gap = 20;
+            const chartWidth = 1200; 
+            const chartHeight = 1200;
+            const margin = { top: 60, right: 20, bottom: 40, left: 100 }; 
+
+            // Calculate width and height of individual month charts
+            const width = (chartWidth - margin.left - margin.right - (years.length) * gap) / years.length; 
+            const height = (chartHeight - margin.top - margin.bottom - (months.length) * gap) / months.length; 
+
+            // Adjust SVG width to accommodate the legend
+            const legendWidth = 30; 
+            const legendMargin = 20;
+            const totalWidth = chartWidth + legendWidth + legendMargin + 80;
+
+            // Create SVG element
+            const svg = d3.select("#chart") 
+                .append("svg") 
+                .attr("width", totalWidth) 
+                .attr("height", chartHeight); 
+
+            // Define X-axis scale (years)
+            const xScale = d3.scaleBand()
+                .domain(years)
+                .range([margin.left, chartWidth - margin.right]) 
+                .padding(0.1);
+
+            // Add X-axis (years) at the top
+            svg.append("g")
+                .attr("transform", `translate(0,${margin.top - gap / 2})`) 
+                .call(d3.axisTop(xScale).tickFormat(d => d)) 
+                .attr("stroke-width", 1.1) 
+                .selectAll("text")
+                .attr("font-family", "Times New Roman")
+                .attr("font-size", "15px")
+                .style("font-weight", 500);
+
+            // Define Y-axis scale (months)
+            const yScaleMonth = d3.scaleBand()
+                .domain(months)
+                .range([margin.top, chartHeight - margin.bottom])
+                .padding(0.1); 
+
+            // Add Y-axis (months) on the left
+            svg.append("g")
+                .attr("transform", `translate(${margin.left - gap / 2},0)`) 
+                .call(d3.axisLeft(yScaleMonth).tickFormat((d, i) => monthNames[i]))
+                .attr("stroke-width", 1.1) 
+                .selectAll("text") 
+                .attr("font-family", "Times New Roman")
+                .attr("font-size", "15px")
+                .style("font-weight", 500);
+
+            // Iterate over years and months to draw individual charts
+            years.forEach((year, i) => {
+                months.forEach((month, j) => {
+                    const monthData = nestedData.get(year)?.get(month) || []; 
+                    if (monthData.length === 0) return; // Skip if no data
+
+                    // Calculate position for this chart
+                    const xPos = margin.left + 10 + i * (width + gap);
+                    const yPos = margin.top + 10 + j * (height + gap); 
+
+                    // Define X-axis scale (time) for this month
+                    const xTimeScale = d3.scaleTime()
+                        .domain(d3.extent(monthData, d => d.date))
+                        .range([xPos, xPos + width]); 
+
+                    // Define Y-axis scale (temperature) for this month
+                    const yScale = d3.scaleLinear()
+                        .domain([d3.min(monthData, d => d.min_temperature) - 15, d3.max(monthData, d => d.max_temperature) + 5]) // Temperature range with padding
+                        .range([yPos + height, yPos]); 
+
+                    // Calculate average max temperature for background color
+                    const avgMaxTemp = d3.max(monthData, d => d.max_temperature);
+
+                    // Draw background rectangle with color based on max temperature
+                    svg.append("rect")
+                        .attr("x", xPos)
+                        .attr("y", yPos)
+                        .attr("width", width)
+                        .attr("height", height)
+                        .attr("fill", colorScale(avgMaxTemp));
+
+                    // Define line generator for max temperature
+                    const lineMax = d3.line()
+                        .x(d => xTimeScale(d.date)) 
+                        .y(d => yScale(d.max_temperature)); 
+
+                    // Draw max temperature line
+                    svg.append("path")
+                        .datum(monthData) 
+                        .attr("fill", "none") 
+                        .attr("stroke", "green")
+                        .attr("stroke-width", 2.0) 
+                        .attr("d", lineMax)
+                        .on("mouseover", function(event) { // Show tooltip on hover
+                            const maxTemp = d3.max(monthData, d => d.max_temperature);
+                            const minTemp = d3.min(monthData, d => d.min_temperature);
+                            const tooltip = d3.select("#tooltip");
+                            tooltip.style("visibility", "visible") 
+                                .html(`Date: ${year}-${month}; Max: ${maxTemp}°C Min: ${minTemp}°C`); // Tooltip content
+                        })
+                        .on("mousemove", function(event) { // Update tooltip position
+                            const tooltip = d3.select("#tooltip");
+                            tooltip.style("left", (event.pageX + 10) + "px")
+                                   .style("top", (event.pageY - 20) + "px");
+                        })
+                        .on("mouseout", function() { // Hide tooltip on mouse out
+                            d3.select("#tooltip").style("visibility", "hidden");
+                        });
+
+                    // Define line generator for min temperature
+                    const lineMin = d3.line()
+                        .x(d => xTimeScale(d.date)) 
+                        .y(d => yScale(d.min_temperature)); 
+
+                    // Draw min temperature line
+                    svg.append("path")
+                        .datum(monthData) 
+                        .attr("fill", "none")
+                        .attr("stroke", "lightblue")
+                        .attr("stroke-width", 2.0) 
+                        .attr("d", lineMin) 
+                        .on("mouseover", function(event) { // Show tooltip on hover
+                            const maxTemp = d3.max(monthData, d => d.max_temperature);
+                            const minTemp = d3.min(monthData, d => d.min_temperature);
+                            const tooltip = d3.select("#tooltip");
+                            tooltip.style("visibility", "visible") 
+                                .html(`Date: ${year}-${month}; Max: ${maxTemp}°C Min: ${minTemp}°C`); // Tooltip content
+                        })
+                        .on("mousemove", function(event) { // Update tooltip position
+                            const tooltip = d3.select("#tooltip");
+                            tooltip.style("left", (event.pageX + 10) + "px")
+                                   .style("top", (event.pageY - 20) + "px");
+                        })
+                        .on("mouseout", function() { // Hide tooltip on mouse out
+                            d3.select("#tooltip").style("visibility", "hidden");
+                        });
+                });
+            });
+
+            // Add the Legend
+            const legendHeight = chartHeight - margin.top - margin.bottom - 800; 
+            const legendX = chartWidth + legendMargin; 
+            const legendY = margin.top; 
+
+            // Create a linear scale for the legend
+            const legendScale = d3.scaleLinear()
+                .domain([0, 40]) 
+                .range([legendY, legendY + legendHeight]); 
+
+            // Create a group for the legend
+            const legend = svg.append("g")
+                .attr("class", "legend"); 
+
+            // Generate data for the gradient 
+            const numSteps = 100; 
+            const stepSize = legendHeight / numSteps; 
+            const legendData = d3.range(0, 40, 40 / numSteps); 
+
+            // Draw legend gradient using small rectangles
+            legend.selectAll("rect")
+                .data(legendData) 
+                .enter()
+                .append("rect") 
+                .attr("x", legendX) 
+                .attr("y", (d, i) => legendY + i * stepSize) 
+                .attr("width", legendWidth)
+                .attr("height", stepSize + 1) 
+                .attr("fill", d => colorScale(d)); 
+
+            // Add label for 0°C at the top of the legend
+            legend.append("text")
+                .attr("x", legendX + legendWidth + 5)
+                .attr("y", legendY + 5)
+                .attr("text-anchor", "start") 
+                .attr("font-family", "Times New Roman")
+                .attr("font-size", "15px")
+                .style("font-weight", 500)
+                .text("0 Celsius");
+
+            // Add label for 40°C at the bottom of the legend
+            legend.append("text")
+                .attr("x", legendX + legendWidth + 5) 
+                .attr("y", legendY + legendHeight - 5)
+                .attr("text-anchor", "start") 
+                .attr("font-family", "Times New Roman")
+                .attr("font-size", "15px")
+                .style("font-weight", 500)
+                .text("40 Celsius");
+        }
+    </script>
+</body>
+</html>

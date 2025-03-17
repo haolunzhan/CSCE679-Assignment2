@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temperature Heatmap</title>
+    <!-- Load D3.js library (version 6)  -->
+    <script src="https://d3js.org/d3.v6.js"></script>
+    <style>
+        /* Styling for the tooltip that appears on hover */
+        .tooltip {
+            position: absolute; 
+            background: white; 
+            padding: 8px; 
+            border: 2px solid #ccc; /* Light gray border */
+            border-radius: 5px; /* Rounded corners */
+            font-size: 10px; 
+            visibility: hidden; 
+        }
+
+        /* Styling for the body to center content vertically and horizontally */
+        body {
+            display: flex; 
+            flex-direction: column;
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0; 
+            gap: 20px; 
+        }
+
+        /* Styling for the container holding the buttons */
+        .button-container {
+            display: flex; 
+            gap: 20px; 
+        }
+
+        /* Styling for buttons */
+        button {
+            padding: 10px 20px; 
+            font-size: 16px; 
+        }
+
+        /* Styling for the SVG container */
+        svg {
+            width: 900px; 
+            height: 500px; 
+            background: white;
+            border: 1px solid #ccc; 
+        }
+    </style>
+</head>
+<body>
+    <!-- Container for the buttons to switch between max and min temperature -->
+    <div class="button-container">
+        <button id="max-temp">Max Temperature</button> 
+        <button id="min-temp">Min Temperature</button> 
+    </div>
+
+    <!-- Container where the heatmap SVG will be appended -->
+    <div id="my_dataviz"></div>
+    <!-- Tooltip div to display data on hover -->
+    <div id="tooltip" class="tooltip"></div>
+
+    <script>
+        // Define margins and dimensions for the SVG
+        const margin = { top: 50, right: 30, bottom: 30, left: 60 },
+            width = 900 - margin.left - margin.right, 
+            height = 500 - margin.top - margin.bottom; 
+
+        // Create SVG element and append a group for the heatmap
+        const svg = d3.select("#my_dataviz") 
+            .append("svg") 
+            .attr("width", width + margin.left + margin.right) 
+            .attr("height", height + margin.top + margin.bottom) 
+            .append("g") 
+            .attr("transform", `translate(${margin.left}, ${margin.top})`); 
+
+        // Variable to track the current temperature type (max or min)
+        let currentType = "max_temperature";
+
+        // Load CSV data and process it
+        d3.csv("https://raw.githubusercontent.com/xiameng552180/CSCE-679-Data-Visualization-Assignment2/main/temperature_daily.csv").then(function(data) {
+            // Convert string data to appropriate types
+            data.forEach(d => {
+                d.max_temperature = +d.max_temperature; 
+                d.min_temperature = +d.min_temperature; 
+                d.date = new Date(d.date); 
+            });
+
+            // Group data by year and month
+            const groupedData = d3.group(data, d => {
+                const year = d3.timeFormat("%Y")(d.date);
+                const month = d3.timeFormat("%m")(d.date);
+                return `${year}-${month}`; 
+            });
+
+            // Aggregate data to get max/min temperatures per month
+            const result = Array.from(groupedData, ([key, values]) => {
+                const [year, month] = key.split("-"); 
+                return {
+                    year: year,
+                    month: month,
+                    max_temperature: d3.max(values, d => d.max_temperature),
+                    min_temperature: d3.min(values, d => d.min_temperature) 
+                };
+            });
+
+            // Filter data to include only years from 1997 onwards
+            const minYear = 1997;
+            const filteredData = result.filter(d => +d.year >= minYear);
+
+            // Define X-axis scale (years)
+            const x = d3.scaleBand()
+                .domain([...new Set(filteredData.map(d => d.year))]) 
+                .range([0, width]) 
+                .padding(0.15); 
+
+            // Define Y-axis scale (months)
+            const y = d3.scaleBand()
+                .domain(["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"])
+                .range([0, height])
+                .padding(0.15); 
+
+            // Define color scale 
+            const colorScale = d3.scaleSequential(d3.interpolateRdYlBu)
+                .domain([d3.max(filteredData, d => d.max_temperature), d3.min(filteredData, d => d.min_temperature)]); // Domain from max to min temp
+
+            // Select tooltip 
+            const tooltip = d3.select("#tooltip");
+
+            // Create heatmap 
+            svg.selectAll() 
+                .data(filteredData) 
+                .enter()
+                .append("rect") 
+                .attr("x", d => x(d.year)) 
+                .attr("y", d => y(d3.timeFormat("%B")(new Date(2000, d.month - 1, 1)))) // Y position based on month name
+                .attr("width", x.bandwidth()) 
+                .attr("height", y.bandwidth()) 
+                .attr("fill", d => colorScale(d[currentType]))
+                .on("mouseover", function(event, d) { 
+                    tooltip.style("visibility", "visible") 
+                           .html(`Date: ${d.year}-${d.month}; max: ${d.max_temperature}°C min: ${d.min_temperature}°C`) 
+                           .style("left", (event.pageX + 10) + "px")
+                           .style("top", (event.pageY - 20) + "px");
+                    d3.select(this).style("stroke", "black").style("stroke-width", "1px"); 
+                })
+                .on("mousemove", function(event) { // Update tooltip position as mouse moves
+                    tooltip.style("left", (event.pageX + 10) + "px")
+                           .style("top", (event.pageY - 20) + "px");
+                })
+                .on("mouseout", function() { // Hide tooltip and remove border on mouse out
+                    tooltip.style("visibility", "hidden");
+                    d3.select(this).style("stroke", "none");
+                });
+
+            // Add X-axis (years) at the top
+            svg.append("g")
+                .attr("transform", `translate(0, 0)`) 
+                .call(d3.axisTop(x).tickSize(5)); 
+
+            // Add Y-axis (months) on the left
+            svg.append("g")
+                .call(d3.axisLeft(y).tickSize(5)); 
+
+            // update heatmap colors based on currentType
+            function updateHeatmap(data) {
+                svg.selectAll("rect") 
+                    .data(data) 
+                    .transition() // Smooth transition
+                    .duration(500) // Transition duration in milliseconds
+                    .attr("fill", d => colorScale(d[currentType])); 
+            }
+
+            // max temperature button
+            d3.select("#max-temp").on("click", function() {
+                currentType = "max_temperature"; // Switch to max temperature
+                updateHeatmap(filteredData); 
+            });
+
+            // min temperature button
+            d3.select("#min-temp").on("click", function() {
+                currentType = "min_temperature"; // Switch to min temperature
+                updateHeatmap(filteredData); 
+            });
+
+        });
+    </script>
+
+</body>
+</html>
