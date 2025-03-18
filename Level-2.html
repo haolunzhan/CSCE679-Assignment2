@@ -38,7 +38,8 @@
     <div id="chart" class="chart"></div>
     <!-- Tooltip div to display data on hover -->
     <div id="tooltip" class="tooltip"></div>
-    <script>
+    <script type="module">
+        import { addLegend } from './utils.js';
         // Load CSV data 
         d3.csv("https://raw.githubusercontent.com/xiameng552180/CSCE-679-Data-Visualization-Assignment2/main/temperature_daily.csv").then(function(data) {
             // Define date parser for the "YYYY-MM-DD" format
@@ -151,9 +152,8 @@
                         .attr("y", yPos)
                         .attr("width", width)
                         .attr("height", height)
-                        .attr("fill", colorScale(avgMaxTemp));
+                        .attr("fill", colorScale(avgMaxTemp))
 
-                    // Define line generator for max temperature
                     const lineMax = d3.line()
                         .x(d => xTimeScale(d.date)) 
                         .y(d => yScale(d.max_temperature)); 
@@ -192,7 +192,7 @@
                         .attr("fill", "none")
                         .attr("stroke", "lightblue")
                         .attr("stroke-width", 2.0) 
-                        .attr("d", lineMin) 
+                        .attr("d", lineMin)
                         .on("mouseover", function(event) { // Show tooltip on hover
                             const maxTemp = d3.max(monthData, d => d.max_temperature);
                             const minTemp = d3.min(monthData, d => d.min_temperature);
@@ -212,54 +212,8 @@
             });
 
             // Add the Legend
-            const legendHeight = chartHeight - margin.top - margin.bottom - 800; 
-            const legendX = chartWidth + legendMargin; 
-            const legendY = margin.top; 
-
-            // Create a linear scale for the legend
-            const legendScale = d3.scaleLinear()
-                .domain([0, 40]) 
-                .range([legendY, legendY + legendHeight]); 
-
-            // Create a group for the legend
-            const legend = svg.append("g")
-                .attr("class", "legend"); 
-
-            // Generate data for the gradient 
-            const numSteps = 100; 
-            const stepSize = legendHeight / numSteps; 
-            const legendData = d3.range(0, 40, 40 / numSteps); 
-
-            // Draw legend gradient using small rectangles
-            legend.selectAll("rect")
-                .data(legendData) 
-                .enter()
-                .append("rect") 
-                .attr("x", legendX) 
-                .attr("y", (d, i) => legendY + i * stepSize) 
-                .attr("width", legendWidth)
-                .attr("height", stepSize + 1) 
-                .attr("fill", d => colorScale(d)); 
-
-            // Add label for 0°C at the top of the legend
-            legend.append("text")
-                .attr("x", legendX + legendWidth + 5)
-                .attr("y", legendY + 5)
-                .attr("text-anchor", "start") 
-                .attr("font-family", "Times New Roman")
-                .attr("font-size", "15px")
-                .style("font-weight", 500)
-                .text("0 Celsius");
-
-            // Add label for 40°C at the bottom of the legend
-            legend.append("text")
-                .attr("x", legendX + legendWidth + 5) 
-                .attr("y", legendY + legendHeight - 5)
-                .attr("text-anchor", "start") 
-                .attr("font-family", "Times New Roman")
-                .attr("font-size", "15px")
-                .style("font-weight", 500)
-                .text("40 Celsius");
+            const adjust = 800
+            addLegend(svg, chartWidth, chartHeight, margin, colorScale, adjust);
         }
     </script>
 </body>

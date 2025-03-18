@@ -43,7 +43,7 @@
 
         /* Styling for the SVG container */
         svg {
-            width: 900px; 
+            width: 1000px; 
             height: 500px; 
             background: white;
             border: 1px solid #ccc; 
@@ -62,7 +62,8 @@
     <!-- Tooltip div to display data on hover -->
     <div id="tooltip" class="tooltip"></div>
 
-    <script>
+    <script type="module">
+        import { addLegend } from './utils.js';
         // Define margins and dimensions for the SVG
         const margin = { top: 50, right: 30, bottom: 30, left: 60 },
             width = 900 - margin.left - margin.right, 
@@ -124,7 +125,7 @@
 
             // Define color scale 
             const colorScale = d3.scaleSequential(d3.interpolateRdYlBu)
-                .domain([d3.max(filteredData, d => d.max_temperature), d3.min(filteredData, d => d.min_temperature)]); // Domain from max to min temp
+                .domain([40, 0]);
 
             // Select tooltip 
             const tooltip = d3.select("#tooltip");
@@ -145,15 +146,15 @@
                            .style("left", (event.pageX + 10) + "px")
                            .style("top", (event.pageY - 20) + "px");
                     d3.select(this).style("stroke", "black").style("stroke-width", "1px"); 
-                })
-                .on("mousemove", function(event) { // Update tooltip position as mouse moves
-                    tooltip.style("left", (event.pageX + 10) + "px")
-                           .style("top", (event.pageY - 20) + "px");
-                })
-                .on("mouseout", function() { // Hide tooltip and remove border on mouse out
-                    tooltip.style("visibility", "hidden");
-                    d3.select(this).style("stroke", "none");
-                });
+                    })
+                    .on("mousemove", function(event) { // Update tooltip position as mouse moves
+                        tooltip.style("left", (event.pageX + 10) + "px")
+                            .style("top", (event.pageY - 20) + "px");
+                    })
+                    .on("mouseout", function() { // Hide tooltip and remove border on mouse out
+                        tooltip.style("visibility", "hidden");
+                        d3.select(this).style("stroke", "none");
+                    });
 
             // Add X-axis (years) at the top
             svg.append("g")
@@ -184,6 +185,10 @@
                 currentType = "min_temperature"; // Switch to min temperature
                 updateHeatmap(filteredData); 
             });
+
+            // Add the Legend
+            const adjust = 80
+            addLegend(svg, width, height, margin, colorScale, adjust);
 
         });
     </script>
