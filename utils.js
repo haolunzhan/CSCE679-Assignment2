@@ -1,4 +1,4 @@
-export
+
 function addLegend(svg, width, height, margin, colorScale, adjust) {
     const legendMargin = 20;
     const legendWidth = 30;

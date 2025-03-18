@@ -38,8 +38,8 @@
     <div id="chart" class="chart"></div>
     <!-- Tooltip div to display data on hover -->
     <div id="tooltip" class="tooltip"></div>
-    <script type="module">
-        import { addLegend } from './utils.js';
+    <script src="utils.js"></script>
+    <script>
         // Load CSV data 
         d3.csv("https://raw.githubusercontent.com/xiameng552180/CSCE-679-Data-Visualization-Assignment2/main/temperature_daily.csv").then(function(data) {
             // Define date parser for the "YYYY-MM-DD" format
